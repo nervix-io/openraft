@@ -98,8 +98,10 @@ where
                 continue;
             };
 
-            let timeout = Duration::from_millis(self.config.heartbeat_interval);
-            let option = RPCOption::new(timeout);
+            // A heartbeat answer sent inside the leader lease can still renew that lease. The
+            // heartbeat interval schedules probes; it is not the response deadline.
+            let response_deadline = Duration::from_millis(self.config.election_timeout_max);
+            let option = RPCOption::new(response_deadline);
 
             let payload = AppendEntriesRequest {
                 vote: self.leader_vote.clone().into_vote(),
@@ -115,7 +117,7 @@ where
 
             let input_stream = Box::pin(futures_util::stream::once(async { payload }));
 
-            let res = C::timeout(timeout, async {
+            let res = C::timeout(response_deadline, async {
                 let mut output = self.network.stream_append(input_stream, option).await?;
                 output.next().await.transpose()
             })
