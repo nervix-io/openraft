@@ -15,6 +15,7 @@ use crate::errors::InitializeError;
 use crate::impls::ProgressResponder;
 use crate::membership::IntoNodes;
 use crate::raft::ClientWriteResult;
+use crate::raft::MembershipCompletion;
 use crate::raft::raft_inner::RaftInner;
 use crate::type_config::alias::LogIdOf;
 
@@ -121,6 +122,11 @@ where C: RaftTypeConfig
         }
 
         Ok(client_write_result)
+    }
+
+    pub(crate) async fn complete_membership(&self, retain: bool) -> Result<MembershipCompletion<C>, Fatal<C>> {
+        let (tx, rx) = ProgressResponder::<C, _>::complete_only();
+        self.inner.call_core(RaftMsg::CompleteMembership { retain, tx }, rx).await
     }
 
     #[since(version = "0.10.0")]

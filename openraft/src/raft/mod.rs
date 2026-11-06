@@ -13,6 +13,7 @@ pub(crate) mod api;
 mod declare_raft_types_test;
 mod impl_raft_blocking_write;
 pub mod linearizable_read;
+mod membership_completion;
 pub(crate) mod message;
 mod raft_inner;
 pub mod responder;
@@ -65,6 +66,7 @@ use tracing::Level;
 use tracing::trace_span;
 
 pub use self::leader::Leader;
+pub use self::membership_completion::MembershipCompletion;
 pub use self::watch_handle::WatchChangeHandle;
 use crate::Extensions;
 use crate::OptionalSend;

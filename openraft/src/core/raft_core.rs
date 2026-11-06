@@ -98,6 +98,7 @@ use crate::quorum::QuorumSet;
 use crate::raft::AppendEntriesRequest;
 use crate::raft::ClientWriteResult;
 use crate::raft::LogSegment;
+use crate::raft::MembershipCompletion;
 use crate::raft::ReadPolicy;
 use crate::raft::StreamAppendError;
 use crate::raft::StreamAppendResult;
@@ -601,6 +602,28 @@ where
         retain: bool,
         tx: ProgressResponder<C, ClientWriteResult<C>>,
     ) {
+        self.propose_membership(changes, retain, CoreResponder::Progress(tx));
+    }
+
+    fn complete_membership(&mut self, retain: bool, tx: ProgressResponder<C, MembershipCompletion<C>>) {
+        let membership = &self.engine.state.membership_state;
+        if membership.effective().membership().get_joint_config().len() <= 1 {
+            tx.on_complete(MembershipCompletion::Unchanged {
+                effective: membership.effective().clone(),
+                committed: membership.committed().clone(),
+            });
+            return;
+        }
+
+        // No Core message or notification can change the checked membership before this proposal.
+        self.propose_membership(
+            ChangeMembers::AddVoterIds(BTreeSet::new()),
+            retain,
+            CoreResponder::MembershipCompletion(tx),
+        );
+    }
+
+    fn propose_membership(&mut self, changes: ChangeMembers<C::NodeId, C::Node>, retain: bool, tx: CoreResponder<C>) {
         if let Err(e) = self.ensure_leader_handler() {
             tx.on_complete(Err(ClientWriteError::ForwardToLeader(e)));
             return;
@@ -617,7 +640,7 @@ where
 
         self.write_entries(
             Batch::of([EntryPayload::Membership(new_membership)]),
-            Batch::of([Some(CoreResponder::Progress(tx))]),
+            Batch::of([Some(tx)]),
             #[cfg(feature = "runtime-stats")]
             C::now(),
         );
@@ -1739,6 +1762,9 @@ where
                 );
 
                 self.change_membership(changes, retain, tx);
+            }
+            RaftMsg::CompleteMembership { retain, tx } => {
+                self.complete_membership(retain, tx);
             }
             RaftMsg::WithRaftState { req } => {
                 req(&self.engine.state);

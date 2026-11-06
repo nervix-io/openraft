@@ -6,6 +6,7 @@ use crate::ChangeMembers;
 use crate::Raft;
 use crate::RaftTypeConfig;
 use crate::errors::ClientWriteError;
+use crate::errors::Fatal;
 use crate::errors::RaftError;
 use crate::errors::into_raft_result::IntoRaftResult;
 #[cfg(doc)]
@@ -13,6 +14,7 @@ use crate::impls::OneshotResponder;
 use crate::raft::ClientWriteResponse;
 #[cfg(doc)]
 use crate::raft::ManagementApi;
+use crate::raft::MembershipCompletion;
 use crate::storage::RaftStateMachine;
 
 /// Implement blocking mode write operations those reply on oneshot channel for communication
@@ -72,6 +74,18 @@ where
         retain: bool,
     ) -> Result<ClientWriteResponse<C>, RaftError<C, ClientWriteError<C>>> {
         self.management_api().change_membership(members, retain).await.into_raft_result()
+    }
+
+    /// Complete the current joint membership if Core still has one.
+    ///
+    /// The joint-state check and proposal execute in the same Core turn. An already uniform
+    /// effective membership returns its effective and committed records without proposing an entry,
+    /// including on a follower. Otherwise this uses the ordinary membership validation, leader and
+    /// lease gates, and waits for application of the recorded joint target's uniform entry.
+    /// `retain` has the same removed-voter semantics as [`Self::change_membership`]; independent
+    /// learners are preserved. This never starts a new voter transition.
+    pub async fn complete_membership(&self, retain: bool) -> Result<MembershipCompletion<C>, Fatal<C>> {
+        self.management_api().complete_membership(retain).await
     }
 
     /// Add a new learner raft node, optionally, blocking until up-to-speed.

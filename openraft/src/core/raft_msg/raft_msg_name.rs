@@ -33,6 +33,7 @@ pub enum RaftMsgName {
     GetLinearizer,
     Initialize,
     ChangeMembership,
+    CompleteMembership,
     HandleTransferLeader,
     WithRaftState,
     ExternalCommand(ExternalCommandName),

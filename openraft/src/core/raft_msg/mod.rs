@@ -17,6 +17,7 @@ use crate::errors::LinearizableReadError;
 use crate::impls::ProgressResponder;
 use crate::raft::AppendEntriesRequest;
 use crate::raft::ClientWriteResult;
+use crate::raft::MembershipCompletion;
 use crate::raft::ReadPolicy;
 use crate::raft::VoteRequest;
 use crate::raft::VoteResponse;
@@ -101,6 +102,11 @@ where C: RaftTypeConfig
         tx: ProgressResponder<C, ClientWriteResult<C>>,
     },
 
+    CompleteMembership {
+        retain: bool,
+        tx: ProgressResponder<C, MembershipCompletion<C>>,
+    },
+
     WithRaftState {
         req: BoxOnce<'static, RaftState<C>>,
     },
@@ -144,6 +150,7 @@ where C: RaftTypeConfig
             RaftMsg::GetLinearizer { .. } => RaftMsgName::GetLinearizer,
             RaftMsg::Initialize { .. } => RaftMsgName::Initialize,
             RaftMsg::ChangeMembership { .. } => RaftMsgName::ChangeMembership,
+            RaftMsg::CompleteMembership { .. } => RaftMsgName::CompleteMembership,
             RaftMsg::HandleTransferLeader { .. } => RaftMsgName::HandleTransferLeader,
             RaftMsg::WithRaftState { .. } => RaftMsgName::WithRaftState,
             RaftMsg::ExternalCommand { cmd } => RaftMsgName::ExternalCommand(cmd.name()),
@@ -176,6 +183,9 @@ where C: RaftTypeConfig
             }
             RaftMsg::ChangeMembership { changes, retain, .. } => {
                 write!(f, "ChangeMembership: {}, retain: {}", changes, retain)
+            }
+            RaftMsg::CompleteMembership { retain, .. } => {
+                write!(f, "CompleteMembership: retain: {}", retain)
             }
             RaftMsg::WithRaftState { .. } => write!(f, "WithRaftState"),
             RaftMsg::HandleTransferLeader { from, to, last_log_id } => {
